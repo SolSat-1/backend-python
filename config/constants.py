@@ -1,0 +1,2 @@
+TIMEZONE_UTC = "UTC"
+TIMEZONE_THAI = "Asia/Bangkok"
