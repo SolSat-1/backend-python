@@ -7,7 +7,6 @@ pydantic_core
 SQLAlchemy
 uvicorn
 requests
-dotenv
 cachetools
 python-dotenv
 pytz

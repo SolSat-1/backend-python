@@ -33,7 +33,6 @@ logger.addHandler(stream_handler)
 # root endpoint
 @app.get("/", status_code=http.HTTPStatus.OK)
 async def default():
-    print("hello world2")
     ans = get_test()
 
     return JSONResponse(
