@@ -8,7 +8,9 @@ from api.v1.v1 import router as v1Router
 from api.status import router as statusRouter
 from api.admin.admin import adminRouter
 import sys
-from core.data_adapter.db import get_db
+from core.data_adapter.db import get_db, get_test
+import json
+
 
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
@@ -31,8 +33,13 @@ logger.addHandler(stream_handler)
 # root endpoint
 @app.get("/", status_code=http.HTTPStatus.OK)
 async def default():
-    print("hello world")
-    return JSONResponse(content={"status": "hello world"})
+    print("hello world2")
+    ans = get_test()
+
+    return JSONResponse(
+        content={"status": "ok", "data": ans},
+        status_code=http.HTTPStatus.OK,
+    )
 
 
 app.include_router(statusRouter, prefix="/status")

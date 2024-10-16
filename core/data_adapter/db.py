@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from urllib.parse import quote_plus
 
@@ -8,6 +9,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker
+
+from sqlalchemy.sql import text
 
 from config.settings import DB
 import logging
@@ -63,27 +66,15 @@ def get_db():
         db.close()
 
 
-# class CartDBBase:
-#     """Base class for all db orm models"""
+def get_test():
+    db: Session = SessionLocal()
 
-#     id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
-#     uuid = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True)
-#     created_at = Column(TIMESTAMP(timezone=True), default=time_now, nullable=False)
-#     updated_at = Column(
-#         TIMESTAMP(timezone=True), default=time_now, onupdate=time_now, nullable=False
-#     )
-#     is_deleted = Column(Boolean, default=False)
+    a = db.execute(text("select * from test"))
+    ans = a.fetchall()
 
-#     @classmethod
-#     def get_by_uuid(cls, uuid):
-#         from controller.context_manager import get_db_session
+    # Convert datetime.time objects to strings
+    ans_list = []
+    for row in ans:
+        ans_list.append([row[0], row[1].strftime("%H:%M:%S")])
 
-#         db: Session = get_db_session()
-#         return db.query(cls).filter(cls.uuid == uuid, cls.is_deleted.is_(False)).first()
-
-#     @classmethod
-#     def get_by_id(cls, id):
-#         from controller.context_manager import get_db_session
-
-#         db: Session = get_db_session()
-#         return db.query(cls).filter(cls.id == id, cls.is_deleted.is_(False)).first()
+    return ans_list
