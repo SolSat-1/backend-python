@@ -12,6 +12,8 @@ import sys
 from fastapi.middleware.cors import CORSMiddleware
 from core.data_adapter.db import get_db, get_test
 import json
+from fastapi.middleware.gzip import GZipMiddleware
+
 
 
 from fastapi_cache import FastAPICache
@@ -30,6 +32,7 @@ app = FastAPI(title="api")
 #     "http://localhost:8080",
 # ]
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,6 +40,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+
 
 
 logger = logging.getLogger(__name__)

@@ -11,3 +11,5 @@ cachetools
 python-dotenv
 pytz
 redis
+google-api-python-client
+geemap

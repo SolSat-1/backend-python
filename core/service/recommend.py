@@ -1,24 +1,18 @@
-# export const useFormStore = create<FormState>((set) => ({
-#   electricityUsage: { type: "", cost: "" },
-#   solarSystem: {
-#     systemType: "",
-#     phaseType: "",
-#     workingHours: [6, 18],
-#     offHours: [19, 23]
-#   },
-#   locationList: [],
-#   // use bangkok as default center
-#   center: { lat: 13.7563, lng: 100.5018 },
-#   setElectricityUsage: (data) => set(() => ({ electricityUsage: data })),
-#   setSolarSystem: (data) => set(() => ({ solarSystem: data })),
-#   setLocationList: (data) => set(() => ({ locationList: data })),
-#   setCenter: (data) => set(() => ({ center: data }))
-# }));
-# data format from js
+import json
+import math
+from typing import List, Any
+from dateutil.relativedelta import relativedelta
+from datetime import datetime
+from google.oauth2 import service_account
+import ee
+
 import asyncio
 from pydantic import BaseModel
 from core.data_adapter.db import get_monthly_payment_by_cardid
+
 # from api.recommend.recommend import OfferReq
+from fastapi import HTTPException
+import os
 
 
 class OfferReq(BaseModel):
@@ -53,3 +47,224 @@ async def get_monthly_payment_pea(user_id: str):
     # return {"monthlyPayment": 0, "cardID": user_id}
 
     return {"monthlyPayment": payment_info[0][1], "cardID": user_id}
+
+
+# Load service account credentials from google_account.json
+# SERVICE_ACCOUNT_FILE = "./google_account.json"
+# credentials = service_account.Credentials.from_service_account_file(
+#     SERVICE_ACCOUNT_FILE,
+#     scopes=["https://www.googleapis.com/auth/earthengine.readonly"],
+# )
+
+# Build the service account info from environment variables
+service_account_info = {
+    "type": os.getenv("GOOGLE_TYPE"),
+    "project_id": os.getenv("GOOGLE_PROJECT_ID"),
+    "private_key_id": os.getenv("GOOGLE_PRIVATE_KEY_ID"),
+    "private_key": os.getenv("GOOGLE_PRIVATE_KEY").replace("\\n", "\n"),
+    "client_email": os.getenv("GOOGLE_CLIENT_EMAIL"),
+    "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+    "auth_uri": os.getenv("GOOGLE_AUTH_URI"),
+    "token_uri": os.getenv("GOOGLE_TOKEN_URI"),
+    "auth_provider_x509_cert_url": os.getenv("GOOGLE_AUTH_PROVIDER_CERT_URL"),
+    "client_x509_cert_url": os.getenv("GOOGLE_CLIENT_CERT_URL"),
+}
+
+# Load service account credentials from the environment variables
+credentials = service_account.Credentials.from_service_account_info(
+    service_account_info,
+    scopes=["https://www.googleapis.com/auth/earthengine.readonly"],
+)
+
+
+# Initialize Google Earth Engine with service account credentials
+def initialize_earth_engine():
+    try:
+        ee.Initialize(credentials)
+        print("Google Earth Engine initialized")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to initialize Earth Engine: {e}"
+        )
+
+
+# สร้าง Polygon ของพื้นที่กรุงเทพมหานคร
+# # ต้องการเป็น coordinate เป็น key
+# def calculate(polygon: List[List[float]]):
+#     # polygon = [[[100.46697782333419, 13.495665330651736], [100.4007799199477, 13.490637567256401], [100.41157677574756, 13.512069607026717], [100.38951093987794, 13.611805120709732], [100.34594770712096, 13.656918647077873], [100.32698245577569, 13.751073105739238], [100.33566409712034, 13.79871877675015], [100.48836795531685, 13.798098660025119], [100.5217509299614, 13.848198961313017], [100.5515165552448, 13.94785696152951], [100.6785889023559, 13.918039659402723], [100.90482832236916, 13.94979482696965], [100.89692182827969, 13.846803697332746], [100.92358686724009, 13.813420721788873], [100.8492761581681, 13.709163520280242], [100.85537397712733, 13.691981106542812], [100.71321211134983, 13.711514796870347], [100.68587527882102, 13.660019233400874], [100.66401614762708, 13.652965400033167], [100.59823205026885, 13.658391425423929], [100.58526126509526, 13.666763007506802], [100.59590661030177, 13.69714874951518], [100.56138675319608, 13.703582465258535], [100.51937381405025, 13.662783922040376], [100.49922000519905, 13.665445257892316], [100.49379397980829, 13.59984202678811], [100.46304650259395, 13.583512275571024],[100.46697782333419,13.495665330651736]]]
+#     bangkok_roi = ee.Geometry.Polygon(polygon)
+
+#     # Define the BANDS dictionary
+#     BANDS = {
+#         "solar_radiation": {
+#             "topic": "surface_net_solar_radiation_sum",
+#             "unit": "W/m^2",
+#             "location": "Bangkok",
+#         },
+#         "precipitation": {
+#             "topic": "surface_latent_heat_flux_sum",
+#             "unit": "mm",
+#             "location": "Bangkok",
+#         },
+#         "wind": {
+#             "topic": "u_component_of_wind_10m",
+#             "unit": "m/s",
+#             "location": "Bangkok",
+#         },
+#         "pressure": {"topic": "surface_pressure", "unit": "pa", "location": "Bangkok"},
+#         "temperature": {
+#             "topic": "temperature_2m",
+#             "unit": "Celsius",
+#             "location": "Bangkok",
+#         },
+#     }
+
+#     # Define the date range
+#     start_date = datetime.now() + relativedelta(days=-10)
+#     end_date = datetime.now() + relativedelta(days=-9)
+
+#     # Function to calculate the mean for a given band
+#     def calculate_mean_for_band(band_name):
+#         dataset = (
+#             ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
+#             .select(band_name)
+#             .filterBounds(bangkok_roi)
+#             .filterDate(start_date, end_date)
+#         )
+
+#         # Reduce the ImageCollection to a single image (mean across all images)
+#         mean_image = dataset.mean()
+
+#         # Calculate the mean for the region of interest
+#         mean_value = mean_image.reduceRegion(
+#             reducer=ee.Reducer.mean(),
+#             geometry=bangkok_roi,
+#             scale=10000,  # Scale in meters
+#             maxPixels=1e9,
+#         )
+
+#         return mean_value.get(band_name).getInfo()
+
+#     real_output = {"response": [], "geometry_lst": polygon}
+#     # Calculate mean for each band and print the results
+#     for band_key, band_name in BANDS.items():
+#         output = {}
+#         mean_value = calculate_mean_for_band(band_name["topic"])
+#         print(band_name["topic"])
+#         print(f'Mean value for {band_key} ({band_name["topic"]}): {int(mean_value)}')
+#         output["band"] = band_name["topic"]
+#         output["value"] = (
+#             round((math.ceil(mean_value) - 32) / 1.8, 1)
+#             if band_name["topic"] == "temperature_2m"
+#             else math.ceil(mean_value)
+#         )
+#         output["unit"] = band_name["unit"]
+#         output["loaction"] = band_name["location"]
+#         real_output["response"].append(output)
+
+#     print(json.dumps(real_output, indent=4))
+
+#     return real_output
+
+
+# def process(array: List[List[float]]):
+#     return calculate(array)
+
+
+# ----
+
+# import ee
+# import json
+# import math
+# from datetime import datetime
+# from dateutil.relativedelta import relativedelta
+# from typing import List
+
+
+def calculate(polygon: List[List[float]], start_date: datetime, end_date: datetime):
+    # Define the region of interest (ROI) based on the polygon
+    bangkok_roi = ee.Geometry.Polygon(polygon)
+
+    # Define the BANDS dictionary
+    BANDS = {
+        "solar_radiation": {
+            "topic": "surface_net_solar_radiation_sum",
+            "unit": "W/m^2",
+        },
+        "precipitation": {
+            "topic": "surface_latent_heat_flux_sum",
+            "unit": "mm",
+        },
+        "wind": {
+            "topic": "u_component_of_wind_10m",
+            "unit": "m/s",
+        },
+        "pressure": {
+            "topic": "surface_pressure",
+            "unit": "Pa",
+        },
+        "temperature": {
+            "topic": "temperature_2m",
+            "unit": "Celsius",
+        },
+    }
+
+    # Combine all band topics to retrieve them in one request
+    band_names = [band_info["topic"] for band_info in BANDS.values()]
+
+    # Retrieve the dataset once, for all bands
+    dataset = (
+        ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
+        .select(band_names)
+        .filterBounds(bangkok_roi)
+        .filterDate(start_date, end_date)
+    )
+
+    # Calculate the mean for all bands in one go
+    mean_image = dataset.mean()
+
+    # Calculate mean values for the region of interest for all bands at once
+    mean_values = mean_image.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=bangkok_roi,
+        scale=10000,  # Scale in meters
+        maxPixels=1e9,
+    ).getInfo()  # Fetch all values in one go
+
+    # Prepare the output structure
+    real_output = {"response": []}
+
+    # Loop through the bands and retrieve the computed mean values
+    for band_key, band_info in BANDS.items():
+        mean_value = mean_values.get(band_info["topic"])
+
+        # If no mean value is returned, skip the band
+        if mean_value is None:
+            continue
+
+        output = {
+            "band": band_info["topic"],
+            "value": (
+                round(
+                    (math.ceil(mean_value) - 32) / 1.8, 1
+                )  # Fahrenheit to Celsius conversion
+                if band_info["topic"] == "temperature_2m"
+                else math.ceil(mean_value)
+            ),
+            "unit": band_info["unit"],
+            "location": "Bangkok",  # Static location
+        }
+        real_output["response"].append(output)
+
+    # Output the final result in a JSON formatted structure
+    # print(json.dumps(real_output, indent=4))
+
+    return real_output["response"]
+
+
+def process(array: List[List[float]]):
+    # Set the date range for the calculation (reused across function calls)
+    start_date = datetime.now() + relativedelta(days=-10)
+    end_date = datetime.now() + relativedelta(days=-9)
+
+    return calculate(array, start_date, end_date)
