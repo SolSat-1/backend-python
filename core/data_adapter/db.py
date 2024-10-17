@@ -78,3 +78,15 @@ def get_test():
         ans_list.append([row[0], row[1].strftime("%H:%M:%S")])
 
     return ans_list
+
+
+def get_monthly_payment_by_cardid(userID: str):
+    db: Session = SessionLocal()
+    a = db.execute(
+        text("select * from monthly_payment where card_id = :card_id"),
+        {"card_id": userID},
+    )
+    ans = a.fetchall()
+    return ans
+
+    

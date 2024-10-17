@@ -7,7 +7,9 @@ import logging
 from api.v1.v1 import router as v1Router
 from api.status import router as statusRouter
 from api.admin.admin import adminRouter
+from api.recommend.recommend import recommendRouter
 import sys
+from fastapi.middleware.cors import CORSMiddleware
 from core.data_adapter.db import get_db, get_test
 import json
 
@@ -20,6 +22,23 @@ from fastapi.responses import JSONResponse
 
 
 app = FastAPI(title="api")
+
+# origins = [
+#     "http://localhost.tiangolo.com",
+#     "https://localhost.tiangolo.com",
+#     "http://localhost",
+#     "http://localhost:8080",
+# ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.DEBUG)
 stream_handler = logging.StreamHandler(sys.stdout)
@@ -44,6 +63,7 @@ async def default():
 app.include_router(statusRouter, prefix="/status")
 app.include_router(v1Router, prefix="/v1")
 app.include_router(adminRouter, prefix="/admin")
+app.include_router(recommendRouter, prefix="/recommend")
 
 
 # register event handlers here
