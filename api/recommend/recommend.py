@@ -9,9 +9,7 @@ recommendRouter = APIRouter(tags=["recommend"])
 
 
 @recommendRouter.post("/offer", status_code=http.HTTPStatus.OK)
-async def recommend(
-    offerReq: OfferReq, x_user_id: Annotated[str | None, Header()] = None
-):
+async def recommend(offerReq: OfferReq, x_user_id: Annotated[str, Header()] = None):
     print("/offer", x_user_id, offerReq)
     offer = await calculate_offer(x_user_id, offerReq)
     return {"status": "ok", "message": "recommend", "data": offer}
@@ -19,9 +17,7 @@ async def recommend(
 
 # POST [/get-monthly-payment?id=1234567890]
 @recommendRouter.get("/get-monthly-payment", status_code=http.HTTPStatus.OK)
-async def get_monthly_payment(
-    id: str, x_user_id: Annotated[str | None, Header()] = None
-):
+async def get_monthly_payment(id: str, x_user_id: Annotated[str, Header()] = None):
     try:
         payment = await get_monthly_payment_pea(id)
     except Exception as e:
