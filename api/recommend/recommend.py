@@ -89,15 +89,13 @@ async def offer(req: OfferCalReq):
 def get_earth_engine_data(geometry: GeometryData):
     try:
         # Parse the geometry data from the request
-
-        # const
         geometry = ee.Geometry.Polygon(
             geometry.coordinates
         )  # Create an Earth Engine polygon geometry
 
         # Fetch Sentinel-2 satellite image collection with cloud masking
         S2 = (
-            ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+            ee.ImageCollection("COPERNICUS/S2")
             .filterDate("2020-01-01", "2020-01-30")
             .filterBounds(geometry)
             .median()
@@ -125,6 +123,12 @@ def get_earth_engine_data(geometry: GeometryData):
         # Clip the composite weight to the polygon geometry
         composite_weight_clipped = composite_weight.clip(geometry)
 
+        # Create a mask for transparency: areas inside the polygon will be 1 (visible), others will be 0 (transparent)
+        transparency_mask = ee.Image.constant(1).clip(geometry)
+
+        # Apply the transparency mask to the composite weight
+        composite_weight_masked = composite_weight_clipped.updateMask(transparency_mask)
+
         # Define the color palette for visualization
         pal = [
             "040274",
@@ -141,18 +145,19 @@ def get_earth_engine_data(geometry: GeometryData):
             "a71001",
         ]
 
-        # Visualization parameters with custom color palette
+        # Visualization parameters with custom color palette and ensuring opacity inside polygon
         vis_params = {
             "bands": ["Composite_Weight"],
             "min": -0.1,
             "max": 1.0,
-            "palette": pal,  # Apply the custom palette
+            "palette": pal,
+            "opacity": 1.0,  # Ensure the opacity inside the polygon is set to 1.0
         }
 
-        # Visualize the clipped composite weight
-        image_visualized = composite_weight_clipped.visualize(**vis_params)
+        # Visualize the masked composite weight
+        image_visualized = composite_weight_masked.visualize(**vis_params)
 
-        # Get the Map ID and URL
+        # Get the Map ID and URL for the visualized image
         map_id = ee.data.getMapId({"image": image_visualized})
         map_url = map_id["tile_fetcher"].url_format
 
