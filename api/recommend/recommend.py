@@ -4,6 +4,7 @@ from core.service.recommend import (
     get_monthly_payment_pea,
     initialize_earth_engine,
     process,
+    cal_offer,
 )
 from typing import List, Any
 
@@ -57,9 +58,20 @@ async def predict_power(geometry: GeometryData):
     # return {"status": "ok", "message": "predict-power", "data": {"power": 1000}}
 
 
+class OfferCalReq(BaseModel):
+    solar_response: int
+    area_response: int
+    bill_response: int
+
+
 # POST [/offer]
-# @recommendRouter.post("/offer", status_code=http.HTTPStatus.OK)
-# async def offer():
+@recommendRouter.post("/offer-cal", status_code=http.HTTPStatus.OK)
+async def offer(req: OfferCalReq):
+    data = cal_offer(req.solar_response, req.area_response, req.bill_response)
+
+    return {"status": "ok", "message": "offer", "data": data}
+    # return {"status": "ok", "message": "offer", "data": {"price": 1000, "offerID": "offer-0001"}}
+
 
 # POST [/get-heat-map]
 # async def get_heat_map():

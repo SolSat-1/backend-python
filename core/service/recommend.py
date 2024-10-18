@@ -5,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 from google.oauth2 import service_account
 import ee
+from geopy.distance import geodesic
 
 import asyncio
 from pydantic import BaseModel
@@ -181,9 +182,30 @@ def initialize_earth_engine():
 # from typing import List
 
 
+# คำนวณพื้นที่ของ Polygon (แปลงพิกัดองศาเป็นระยะทางจริง)
+def calculate_area_km2(polygon_coords):
+    # แปลงพิกัด latitude, longitude เป็นระยะทางจริงในหน่วยเมตร (ใช้ geodesic)
+    area = 0.0
+    for i in range(len(polygon_coords) - 1):
+        p1 = polygon_coords[i]
+        p2 = polygon_coords[i + 1]
+        # คำนวณระยะทางระหว่างแต่ละจุด (ระยะทางในหน่วยกิโลเมตร)
+        dist = geodesic(p1, p2).meters
+        area += dist
+    return area / 2.0  # ใช้สูตรหารสองสำหรับพื้นที่ของ polygon
+
+
 def calculate(polygon: List[List[float]], start_date: datetime, end_date: datetime):
     # Define the region of interest (ROI) based on the polygon
+
+    # print("polygon", polygon)
     bangkok_roi = ee.Geometry.Polygon(polygon)
+
+    e = []
+    for i in range(len(polygon)):
+        e.append((polygon[i][1], polygon[i][0]))
+
+    area = calculate_area_km2(e)
 
     # Define the BANDS dictionary
     BANDS = {
@@ -227,7 +249,7 @@ def calculate(polygon: List[List[float]], start_date: datetime, end_date: dateti
     mean_values = mean_image.reduceRegion(
         reducer=ee.Reducer.mean(),
         geometry=bangkok_roi,
-        scale=10000,  # Scale in meters
+        scale=30000,  # Scale in meters
         maxPixels=1e9,
     ).getInfo()  # Fetch all values in one go
 
@@ -236,18 +258,30 @@ def calculate(polygon: List[List[float]], start_date: datetime, end_date: dateti
 
     # Loop through the bands and retrieve the computed mean values
     for band_key, band_info in BANDS.items():
+        print(
+            f"Mean value for {band_key} ({band_info['topic']}): {mean_values.get(band_info['topic'])}"
+        )
         mean_value = mean_values.get(band_info["topic"])
 
         # If no mean value is returned, skip the band
         if mean_value is None:
-            continue
+            # map deafult value for each type
+            if band_info["topic"] == "surface_net_solar_radiation_sum":
+                # mean_value = 300 * area from polygon
+                mean_value = 1361 * area
+            else:
+                # else if band_info["topic"] == "surface_net_solar_radiation_sum":
+                #     mean_value = 600
+                # else if band_info["topic"] == "surface_latent_heat_flux_sum":
+
+                continue
+
+            # continue
 
         output = {
             "band": band_info["topic"],
             "value": (
-                round(
-                    (math.ceil(mean_value) - 32) / 1.8, 1
-                )  # Fahrenheit to Celsius conversion
+                round(math.ceil(mean_value) - 273, 1)
                 if band_info["topic"] == "temperature_2m"
                 else math.ceil(mean_value)
             ),
@@ -264,7 +298,169 @@ def calculate(polygon: List[List[float]], start_date: datetime, end_date: dateti
 
 def process(array: List[List[float]]):
     # Set the date range for the calculation (reused across function calls)
-    start_date = datetime.now() + relativedelta(days=-10)
+    start_date = datetime.now() + relativedelta(days=-100)
     end_date = datetime.now() + relativedelta(days=-9)
 
     return calculate(array, start_date, end_date)
+
+
+# -----
+
+import math
+
+
+# ฟังก์ชันคำนวณพลังงานที่ผลิตได้ (kWh ต่อวัน)
+def calculate_energy_generated(solar_radiation, area, efficiency, time, theta):
+    cos_theta = math.cos(math.radians(theta))  # แปลงมุมเป็นรัศมีและคำนวณ cos(θ)
+    energy_generated = (solar_radiation * area * efficiency * time * cos_theta) / 1000
+    return energy_generated
+
+
+# ฟังก์ชันคำนวณการประหยัดพลังงาน (บาท/ปี)
+def calculate_yearly_savings(energy_generated_per_day, electricity_price):
+    yearly_energy = energy_generated_per_day * 365  # พลังงานที่ผลิตได้ต่อปี (kWh)
+    yearly_savings = yearly_energy * electricity_price  # เงินที่ประหยัดได้ต่อปี (บาท)
+    return yearly_savings
+
+
+# ฟังก์ชันคำนวณการลดการปล่อย CO2 (กิโลกรัม CO2 ต่อปี)
+def calculate_co2_reduction(energy_generated_per_day):
+    yearly_energy = energy_generated_per_day * 365  # พลังงานที่ผลิตได้ต่อปี (kWh)
+    co2_reduction = yearly_energy * 0.707  # CO2 ที่ลดได้ (กิโลกรัม) ต่อ kWh
+    return co2_reduction
+
+
+# ฟังก์ชันคำนวณการคืนทุน (ปี)
+def calculate_payback_period(plan_cost, yearly_savings):
+    return plan_cost / yearly_savings  # ระยะเวลาคืนทุน (ปี)
+
+
+# ฟังก์ชันคำนวณการทดแทนค่าไฟ (เป็นเปอร์เซ็นต์)
+def calculate_electricity_replacement(
+    energy_generated_per_year, current_electricity_bill, electricity_price
+):
+    current_electricity_usage_kWh = (
+        current_electricity_bill / electricity_price
+    )  # ปริมาณการใช้ไฟฟ้าปัจจุบัน (kWh)
+    replacement_percentage = (
+        energy_generated_per_year / current_electricity_usage_kWh
+    ) * 100
+    return replacement_percentage
+
+
+def cal_offer(solar_response: int, area_response: int, bill_response: int):
+    # ข้อมูลพื้นฐานสำหรับการคำนวณ_
+    # solar_radiation = 600  # W/m²
+    solar_radiation = solar_response / 86400 * 5  # W/m²
+    time = 24  # ชั่วโมงต่อวัน
+    electricity_price = 4  # บาทต่อ kWh
+    current_electricity_bill = bill_response  # ค่าไฟฟ้าปัจจุบันต่อปี (บาท)
+
+    # แผนการติดตั้ง 3 แบบ (ขนาดพื้นที่และประสิทธิภาพของแผง และค่าใช้จ่ายติดตั้ง)
+    plans = [
+        {
+            "name": "Plan_1",
+            "area": area_response,
+            "efficiency": 0.155,
+            "cost": 125 * area_response,
+        },  # 18.5% efficiency
+        {
+            "name": "Plan_2",
+            "area": area_response,
+            "efficiency": 0.201,
+            "cost": 145 * area_response,
+        },  # 20.1% efficiency
+        {
+            "name": "Plan_3",
+            "area": area_response,
+            "efficiency": 0.240,
+            "cost": 170 * area_response,
+        },  # 21.0% efficiency
+    ]
+
+    # สร้าง dictionary เพื่อเก็บข้อมูลแผนทั้งหมด
+    solar_plans = {"adjustable": [], "non_adjustable": []}
+
+    # คำนวณสำหรับแผงที่ปรับมุมได้ (cos(0) = 1)
+    for plan in plans:
+        energy_per_day = calculate_energy_generated(
+            solar_radiation, plan["area"], plan["efficiency"], time, 0
+        )
+        yearly_savings = calculate_yearly_savings(energy_per_day, electricity_price)
+        co2_reduction = calculate_co2_reduction(energy_per_day)
+        payback_period = calculate_payback_period(plan["cost"], yearly_savings)
+        replacement_percentage = calculate_electricity_replacement(
+            energy_per_day * 365, current_electricity_bill, electricity_price
+        )
+
+        solar_plans["adjustable"].append(
+            {
+                plan["name"]: {
+                    "energy_per_day": {
+                        "value": round(energy_per_day, 2),
+                        "unit": "kWh",
+                    },
+                    "yearly_savings": {
+                        "value": round(yearly_savings, 2),
+                        "unit": "บาท/ปี",
+                    },
+                    "co2_reduction": {
+                        "value": round(co2_reduction, 2),
+                        "unit": "กิโลกรัม CO2/ปี",
+                    },
+                    "payback_period": {"value": round(payback_period, 2), "unit": "ปี"},
+                    "electricity_replacement": {
+                        "value": round(replacement_percentage, 2),
+                        "unit": "%",
+                    },
+                    "efficiency": {"value": plan["efficiency"] * 100, "unit": "%"},
+                    "plan_cost": {"value": plan["cost"], "unit": "บาท"},
+                }
+            }
+        )
+
+    # คำนวณสำหรับแผงที่ปรับมุมไม่ได้ (cos(23.5°) = 0.917)
+    for plan in plans:
+        energy_per_day = calculate_energy_generated(
+            solar_radiation, plan["area"], plan["efficiency"], time, 23.5
+        )
+        yearly_savings = calculate_yearly_savings(energy_per_day, electricity_price)
+        co2_reduction = calculate_co2_reduction(energy_per_day)
+        payback_period = calculate_payback_period(plan["cost"], yearly_savings)
+        replacement_percentage = calculate_electricity_replacement(
+            energy_per_day, current_electricity_bill, electricity_price
+        )
+
+        solar_plans["non_adjustable"].append(
+            {
+                plan["name"]: {
+                    "energy_per_day": {
+                        "value": round(energy_per_day, 2),
+                        "unit": "kWh",
+                    },
+                    "yearly_savings": {
+                        "value": round(yearly_savings, 2),
+                        "unit": "บาท/ปี",
+                    },
+                    "co2_reduction": {
+                        "value": round(co2_reduction, 2),
+                        "unit": "กิโลกรัม CO2/ปี",
+                    },
+                    "payback_period": {"value": round(payback_period, 2), "unit": "ปี"},
+                    "electricity_replacement": {
+                        "value": round(replacement_percentage, 2),
+                        "unit": "%",
+                    },
+                    "efficiency": {
+                        "value": round(plan["efficiency"] * 100, 2),
+                        "unit": "%",
+                    },
+                    "plan_cost": {"value": round(plan["cost"], 2), "unit": "บาท"},
+                }
+            }
+        )
+    return solar_plans
+    # แสดงผลข้อมูลทั้งหมดในรูปแบบ dictionary
+    # import json
+    # json_output = json.dumps(solar_plans, ensure_ascii=False, indent=4)
+    # print(json_output)

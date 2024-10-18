@@ -13,3 +13,4 @@ pytz
 redis
 google-api-python-client
 geemap
+geopy
