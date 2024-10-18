@@ -362,21 +362,23 @@ def cal_offer(solar_response: int, area_response: int, bill_response: int):
             "name": "Plan_1",
             "area": area_response,
             "efficiency": 0.155,
-            "cost": 125 * area_response,
+            "cost": 125 * 5 * area_response,
         },  # 18.5% efficiency
         {
             "name": "Plan_2",
             "area": area_response,
             "efficiency": 0.201,
-            "cost": 145 * area_response,
+            "cost": 150 * 5 * area_response,
         },  # 20.1% efficiency
         {
             "name": "Plan_3",
             "area": area_response,
             "efficiency": 0.240,
-            "cost": 170 * area_response,
+            "cost": 200 * 5 * area_response,
         },  # 21.0% efficiency
     ]
+
+    print("plans", plans)
 
     # สร้าง dictionary เพื่อเก็บข้อมูลแผนทั้งหมด
     solar_plans = {"adjustable": [], "non_adjustable": []}
