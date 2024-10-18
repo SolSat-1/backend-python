@@ -430,7 +430,7 @@ def cal_offer(solar_response: int, area_response: int, bill_response: int):
         co2_reduction = calculate_co2_reduction(energy_per_day)
         payback_period = calculate_payback_period(plan["cost"], yearly_savings)
         replacement_percentage = calculate_electricity_replacement(
-            energy_per_day, current_electricity_bill, electricity_price
+            energy_per_day * 365, current_electricity_bill, electricity_price
         )
 
         solar_plans["non_adjustable"].append(
