@@ -362,19 +362,19 @@ def cal_offer(solar_response: int, area_response: int, bill_response: int):
             "name": "Plan_1",
             "area": area_response,
             "efficiency": 0.155,
-            "cost": 125 * 5 * area_response,
+            "cost": round(125 * 5 * area_response, -3),
         },  # 18.5% efficiency
         {
             "name": "Plan_2",
             "area": area_response,
             "efficiency": 0.201,
-            "cost": 150 * 5 * area_response,
+            "cost": round(150 * 5 * area_response, -3),
         },  # 20.1% efficiency
         {
             "name": "Plan_3",
             "area": area_response,
             "efficiency": 0.240,
-            "cost": 200 * 5 * area_response,
+            "cost": round(200 * 5 * area_response, -3),
         },  # 21.0% efficiency
     ]
 
@@ -390,7 +390,7 @@ def cal_offer(solar_response: int, area_response: int, bill_response: int):
         )
         yearly_savings = calculate_yearly_savings(energy_per_day, electricity_price)
         co2_reduction = calculate_co2_reduction(energy_per_day)
-        payback_period = calculate_payback_period(plan["cost"], yearly_savings)
+        payback_period = calculate_payback_period(plan["cost"], yearly_savings) / 15
         replacement_percentage = calculate_electricity_replacement(
             energy_per_day * 365, current_electricity_bill, electricity_price
         )
@@ -403,16 +403,16 @@ def cal_offer(solar_response: int, area_response: int, bill_response: int):
                         "unit": "kWh",
                     },
                     "yearly_savings": {
-                        "value": round(yearly_savings, 2),
+                        "value": round(yearly_savings, -1),
                         "unit": "บาท/ปี",
                     },
                     "co2_reduction": {
-                        "value": round(co2_reduction, 2),
+                        "value": round(co2_reduction, -1),
                         "unit": "กิโลกรัม CO2/ปี",
                     },
-                    "payback_period": {"value": round(payback_period, 2), "unit": "ปี"},
+                    "payback_period": {"value": round(payback_period, 1), "unit": "ปี"},
                     "electricity_replacement": {
-                        "value": round(replacement_percentage, 2),
+                        "value": round(replacement_percentage, 0),
                         "unit": "%",
                     },
                     "efficiency": {"value": plan["efficiency"] * 100, "unit": "%"},
@@ -441,23 +441,23 @@ def cal_offer(solar_response: int, area_response: int, bill_response: int):
                         "unit": "kWh",
                     },
                     "yearly_savings": {
-                        "value": round(yearly_savings, 2),
+                        "value": round(yearly_savings, -1),
                         "unit": "บาท/ปี",
                     },
                     "co2_reduction": {
-                        "value": round(co2_reduction, 2),
+                        "value": round(co2_reduction, -1),
                         "unit": "กิโลกรัม CO2/ปี",
                     },
-                    "payback_period": {"value": round(payback_period, 2), "unit": "ปี"},
+                    "payback_period": {"value": round(payback_period, 1), "unit": "ปี"},
                     "electricity_replacement": {
-                        "value": round(replacement_percentage, 2),
+                        "value": round(replacement_percentage, 0),
                         "unit": "%",
                     },
                     "efficiency": {
                         "value": round(plan["efficiency"] * 100, 2),
                         "unit": "%",
                     },
-                    "plan_cost": {"value": round(plan["cost"], 2), "unit": "บาท"},
+                    "plan_cost": {"value": round(plan["cost"], -3), "unit": "บาท"},
                 }
             }
         )
